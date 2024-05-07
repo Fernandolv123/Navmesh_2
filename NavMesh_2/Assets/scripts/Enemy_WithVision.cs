@@ -10,7 +10,6 @@ public class Enemy_WithVision : MonoBehaviour
     public EnemyState lastState;
 
     private bool playerInSightView;
-    private bool playerChasing;
     public LayerMask playerMask;
     private NavMeshAgent agent;
     public Vector3 lastPosition;
@@ -42,22 +41,19 @@ public class Enemy_WithVision : MonoBehaviour
             OnLastStateChanged();
         }
         lastState = state;
+
         remainingdistance = agent.remainingDistance;
         destino = agent.destination;
+
         playerInSightView = CheckForVision();
         
-        // Debug.Log(lastPosition  +" != "+  transform.position);
-        // Debug.Log(Vector3.Distance(lastPosition,transform.position));
-        Debug.Log((Vector3.Distance(lastPosition,transform.position) < 4f) +" && " +(state==EnemyState.EndChasing));
-        if (playerInSightView){
+        if (playerInSightView && state != EnemyState.Sleep){
             state =EnemyState.Chasing;
             lookingAroundEnabled=false;
         } else if (Vector3.Distance(lastPosition,transform.position) > 4f && state== EnemyState.Chasing){
-            //Debug.Log("Distancia: "+Vector3.Distance(lastPosition,transform.position));
-            //Debug.Log("direction: " + agent.destination);
             state =EnemyState.EndChasing;
         } else if (Vector3.Distance(lastPosition,transform.position) < 4f && state==EnemyState.EndChasing){
-            Debug.Log("Entra");
+            //Debug.Log("Entra");
             lookingAroundEnabled = true;
             state = EnemyState.LookingAround;
         }
@@ -67,19 +63,12 @@ public class Enemy_WithVision : MonoBehaviour
     private IEnumerator CheckForState(){
         switch(state){
             case EnemyState.EndChasing:
-            //al NavMeshAgent no le gusta mandarle varias veces al mismo punto
-                // agent.destination = lastPosition;
-                yield return new WaitForSeconds(0.05f);
                 break;
             case EnemyState.LookingAround:
-                //lastPosition = transform.position;
-                yield return new WaitForSeconds(0.05f);
                 break;
             case EnemyState.Chasing:
                 agent.destination = player.transform.position;
-                
-                //esto evita que el enemigo se quede quieto
-                yield return new WaitForSeconds(0.05f);
+                //yield return new WaitForSeconds(0.05f);
                 break;
             case EnemyState.Catching:
                 break;
@@ -91,6 +80,7 @@ public class Enemy_WithVision : MonoBehaviour
         Gizmos.DrawLine(transform.position,agent.destination);
     }
     bool CheckForVision(){
+        //Collider[] = Physics.OverlapSphere este método devuelve los colliders detectados
         if (Physics.CheckSphere(transform.position,25,playerMask)){//phisics.SphereOverlapse puede ser una mejor solucion para no tener que tener la referencia a la layermask
             RaycastHit hit;
             if (Physics.Raycast(transform.position+Vector3.up,player.transform.position-transform.position, out hit,(player.transform.position-transform.position).magnitude)){
@@ -109,16 +99,17 @@ public class Enemy_WithVision : MonoBehaviour
             yield return null;
             //Debug.Log(wanderingPoints.IndexOf(activeWayPoint) + " || " + wanderingPoints.Count-1);
             //Debug.Log(wanderingPoints.IndexOf(activeWayPoint) == wanderingPoints.Count-1 ? 0 : wanderingPoints.IndexOf(activeWayPoint));
+            //if (agent.destination == lastPosition) state = EnemyState.LookingAround;
             for (int i = wanderingPoints.IndexOf(activeWayPoint) == wanderingPoints.Count-1 ? 0 : wanderingPoints.IndexOf(activeWayPoint); i<=wanderingPoints.Count-1;i++){
                 if(!lookingAroundEnabled) break;
                 activeWayPoint = wanderingPoints[i];
                 agent.destination = wanderingPoints[i].position;
                 yield return new WaitForSeconds(0.05f);
                 yield return new WaitUntil(() => agent.remainingDistance <=1);
+                if(agent.destination != (lastPosition - Vector3.up*4)) state = EnemyState.Sleep;
             }
         }
         if(!lookingAroundEnabled){
-            Debug.Log("Se ha roto el bucle");
             //ResumePatrol();
             yield return new WaitUntil(() => lookingAroundEnabled);
             StartCoroutine("LookingAround");
@@ -137,7 +128,7 @@ public class Enemy_WithVision : MonoBehaviour
     public void OnLastStateChanged(){
         //OnLastStateChanged se llama con el estado previo al cambio
         //Ej: si el cambio es LookingAround => Chasing el valor utilizado es LookingAround
-        Debug.Log("Cambiado desde: " +state);
+        //Debug.Log("Cambiado desde: " +state);
         GameObject go;
         switch(lastState){
             case EnemyState.Chasing:
@@ -154,6 +145,9 @@ public class Enemy_WithVision : MonoBehaviour
             lastPosition = transform.position;
             //Invoke("ReturnPath",2f);
             break;
+            case EnemyState.Sleep:
+            agent.isStopped=false;
+            break;
 
         }
     }
@@ -163,7 +157,7 @@ public class Enemy_WithVision : MonoBehaviour
         GameObject go;
         switch(state){
             case EnemyState.Chasing:
-            //si el nuevo estado es Chasing, se mostrara el gameobject de player encontrado
+                //si el nuevo estado es Chasing, se mostrara el gameobject de player encontrado
                 go = Instantiate(playerFound,transform.position+Vector3.up*4,Quaternion.identity);
                 go.transform.parent = transform;
                 agent.isStopped=true;
@@ -171,9 +165,9 @@ public class Enemy_WithVision : MonoBehaviour
                 Invoke("ReturnPath",0.5f);
                 break;
             case EnemyState.LookingAround:
-                Debug.Log("Entra para la position");
-                agent.isStopped=true;
-                Invoke("ReturnPath",1f);
+                //Debug.Log("Entra para la position");
+                //agent.isStopped=true;
+                //Invoke("ReturnPath",1f);
                 //lastPosition = transform.position;
                 agent.speed = 15;
                 break;
@@ -182,9 +176,16 @@ public class Enemy_WithVision : MonoBehaviour
                 //si el nuevo estado es EndChasing, se devuelve a la posicion en la que estaba antes de continuar
                 agent.destination = lastPosition;
                 break;
+            case EnemyState.Sleep:
+            //if (agent.destination != lastPosition) state = EnemyState.LookingAround;
+                agent.isStopped = true;
+                Invoke("ReturnPath",5f);
+            break;
         }
     }
     public void ReturnPath(){
         agent.isStopped=false;
+
+        if (state == EnemyState.Sleep) state=EnemyState.LookingAround;
     }
 }

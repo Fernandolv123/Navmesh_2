@@ -60,5 +60,6 @@ public enum EnemyState{
     LookingAround,
     Chasing,
     EndChasing,
+    Sleep,
     Catching
 }

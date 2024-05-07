@@ -1,14 +1,20 @@
 using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 using UnityEngine.AI;
 
 public class Realistic_Enemy : MonoBehaviour
 {
+    public int visionAngle;
     public GameObject player;
     public EnemyState state;
     public EnemyState lastState;
     public LayerMask playerMask;
+    private float viewDistance = 30f;
+
+    private float viewAngle1;
+    private float viewAngle2;
 
     private NavMeshAgent agent;
 
@@ -24,6 +30,8 @@ public class Realistic_Enemy : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        viewAngle1 = DirectionAngle(transform.eulerAngles.y, -visionAngle / 2);
+        viewAngle2 = DirectionAngle(transform.eulerAngles.y, visionAngle / 2);
         if(lastState != state){
             OnStateChanged();
             OnLastStateChanged();
@@ -33,7 +41,12 @@ public class Realistic_Enemy : MonoBehaviour
         
         // Debug.Log(lastPosition  +" != "+  transform.position);
         // Debug.Log(Vector3.Distance(lastPosition,transform.position));
-        Debug.Log((Vector3.Distance(lastPosition,transform.position) < 4f) +" && " +(state==EnemyState.EndChasing));
+        // Debug.Log((Vector3.Distance(lastPosition,transform.position) < 4f) +" && " +(state==EnemyState.EndChasing));
+        Vector3 directionToTarget = (player.transform.position - transform.position).normalized;
+        // Debug.Log(Vector3.Angle(transform.forward,directionToTarget));
+        // Debug.Log("View1: " + viewAngle1);
+        // Debug.Log("View2: " + viewAngle2);
+
         if (playerInSightView){
             state =EnemyState.Chasing;
             lookingAroundEnabled=false;
@@ -75,9 +88,15 @@ public class Realistic_Enemy : MonoBehaviour
     void OnDrawGizmos(){
         Gizmos.DrawWireSphere(transform.position,25);
         Gizmos.DrawLine(transform.position,agent.destination);
-        Gizmos.DrawLine(transform.position,new Vector3(transform.position.x+15,transform.position.y,transform.position.z+20));
-        Gizmos.DrawLine(transform.position,new Vector3(transform.position.x-15,transform.position.y,transform.position.z+20));
-
+        //Handles.DrawWireArc(transform.position,Vector3.up,Vector3.forward,360,radius);
+        Vector3 viewDirection1 = Quaternion.Euler(0, viewAngle1, 0) * transform.forward;
+        Vector3 viewDirection2 = Quaternion.Euler(0, viewAngle2, 0) * transform.forward;
+        //Handles.DrawLine(transform.position,transform.position + viewAngle1 * visionAngle);
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawRay(transform.position, viewDirection1 * viewDistance);
+        Gizmos.DrawRay(transform.position, viewDirection2 * viewDistance);
+        //Handles.DrawLine(transform.position,new Vector3(transform.forward.x+viewAngle2.x,0,transform.forward.z+viewAngle2.z));
+        //Handles.DrawLine(transform.position,new Vector3(transform.forward.x+viewAngle1.x,0,transform.forward.z+viewAngle1.z));
     }
     bool CheckForVision(){
         if (Physics.CheckSphere(transform.position,25,playerMask)){//phisics.SphereOverlapse puede ser una mejor solucion para no tener que tener la referencia a la layermask
@@ -95,11 +114,13 @@ public class Realistic_Enemy : MonoBehaviour
     }
 
     public bool CheckForAngle(Transform hit){
-        if(hit.position.z <= transform.position.z+10 && hit.transform.position.z >= transform.position.z-10 && hit.position.x <= transform.position.x+3 && hit.position.x >= transform.position.x-20){
-            Debug.Log("Encontrado en: " + hit.transform + " estando en: " + transform.position);
-            return true;
-        }
-        return false;
+        Vector3 directionToTarget = (hit.position - transform.position).normalized;
+        Debug.Log(Vector3.Angle(transform.forward,directionToTarget) + " < " + visionAngle);
+        return Vector3.Angle(transform.forward,directionToTarget) < visionAngle/2;
+    }
+    public float DirectionAngle(float eulerY, float angleInDegrees){
+        angleInDegrees += eulerY;
+        return angleInDegrees;
     }
     public void OnStateChanged(){}
     public void OnLastStateChanged(){}
