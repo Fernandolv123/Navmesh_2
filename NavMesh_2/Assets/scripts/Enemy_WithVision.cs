@@ -88,7 +88,7 @@ public class Enemy_WithVision : MonoBehaviour
     }
     void OnDrawGizmos(){
         Gizmos.DrawWireSphere(transform.position,25);
-        Gizmos.DrawLine(transform.position,player.transform.position);
+        Gizmos.DrawLine(transform.position,agent.destination);
     }
     bool CheckForVision(){
         if (Physics.CheckSphere(transform.position,25,playerMask)){//phisics.SphereOverlapse puede ser una mejor solucion para no tener que tener la referencia a la layermask
@@ -167,13 +167,18 @@ public class Enemy_WithVision : MonoBehaviour
                 go = Instantiate(playerFound,transform.position+Vector3.up*4,Quaternion.identity);
                 go.transform.parent = transform;
                 agent.isStopped=true;
+                agent.speed = 20;
                 Invoke("ReturnPath",0.5f);
                 break;
             case EnemyState.LookingAround:
-            Debug.Log("Entra para la position");
+                Debug.Log("Entra para la position");
+                agent.isStopped=true;
+                Invoke("ReturnPath",1f);
                 //lastPosition = transform.position;
+                agent.speed = 15;
                 break;
             case EnemyState.EndChasing:
+                agent.speed = 15;
                 //si el nuevo estado es EndChasing, se devuelve a la posicion en la que estaba antes de continuar
                 agent.destination = lastPosition;
                 break;
